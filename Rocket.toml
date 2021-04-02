@@ -1,0 +1,12 @@
+[default]
+host = "localhost"
+
+[debug]
+
+[debug.my_domain]
+greeting = "Hello from debug!"
+
+[release]
+
+[release.my_domain]
+greeting = "Hello from prod!"
