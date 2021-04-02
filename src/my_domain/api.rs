@@ -1,11 +1,11 @@
 use super::facade::MyDomainFacade;
 use rocket::{get, Route, State};
 use rocket_contrib::json::Json;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
-#[derive(Serialize)]
-struct HelloWorldResponse {
-    greeting: String,
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub(crate) struct HelloWorldResponse {
+    pub(crate) greeting: String,
 }
 
 #[get("/hello-world")]

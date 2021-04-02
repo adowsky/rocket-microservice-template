@@ -2,6 +2,9 @@ pub(crate) mod api;
 pub(crate) mod facade;
 mod config;
 
+#[cfg(test)]
+mod integration_tests;
+
 use rocket::Rocket;
 
 
