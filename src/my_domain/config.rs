@@ -1,7 +1,6 @@
 use serde::Deserialize;
 
 #[derive(Deserialize)]
-
 pub(crate) struct MyDomainProperties {
     pub greeting: Option<String>,
 
