@@ -1,10 +1,11 @@
 use crate::stats::Metrics;
 use async_trait::async_trait;
+use common_macros::hash_map;
 use core::time;
 use rocket::fairing::Fairing;
 use rocket::{fairing::Kind, get, http::Header, Data, Request, Response, Rocket, State};
 use serde::Deserialize;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 pub(crate) const DEFAULT_PROMETHEUS_ENDPOINT: &str = "/prometheus";
 
@@ -50,9 +51,21 @@ impl Fairing for Metrics {
         req.local_cache(|| Instant::now());
     }
 
-    async fn on_response<'r>(&self, req: &'r Request<'_>, _res: &mut Response<'r>) {
+    async fn on_response<'r>(&self, req: &'r Request<'_>, res: &mut Response<'r>) {
         let request_start_time = req.local_cache(|| Instant::now());
         let time_elapsed = Instant::now().duration_since(*request_start_time);
-        self.record("request_millis", time_elapsed.as_millis() as f64);
+        if req.route().is_none() {
+            return;
+        }
+
+        self.record(
+            "request_millis",
+            time_elapsed.as_millis() as f64,
+            &hash_map! {
+                "path" => req.route().unwrap().uri.to_string(),
+                "http_method" => req.route().unwrap().method.to_string(),
+                "response_code" => res.status().code.to_string()
+            },
+        );
     }
 }

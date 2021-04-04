@@ -15,5 +15,4 @@ prometheus = { version = "0.12", feature = ["process"] }
 serde = "1.0"
 serde_json = "1.0"
 flurry = "0.3.1"
-
-assertx = "1.1.6"
+common_macros = "0.1"

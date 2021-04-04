@@ -1,26 +1,35 @@
-use std::string::FromUtf8Error;
-
-use flurry::HashMap as ConcurrentHashMap;
-use prometheus::{CounterVec, Encoder, Histogram, HistogramOpts, Registry, TextEncoder};
-
 #[cfg(test)]
 mod tests;
 
+
+use std::{collections::HashMap, ops::Deref, string::FromUtf8Error};
+use std::sync::Arc;
+
+use flurry::HashMap as ConcurrentHashMap;
+use prometheus::{Counter, CounterVec, Encoder, Histogram, HistogramOpts, HistogramVec, Opts, Registry, TextEncoder, core::Collector};
+
 pub(crate) enum MetricError {}
+
+const NO_TAGS: Vec<&'static str> = Vec::new();
 
 #[derive(Clone)]
 pub(crate) struct Metrics {
     registry: Registry,
-    counters: ConcurrentHashMap<String, CounterVec>,
-    histograms: ConcurrentHashMap<String, Histogram>,
+    counters: Arc<ConcurrentHashMap<String, Counter>>,
+    labelled_counters: Arc<ConcurrentHashMap<String, CounterVec>>,
+
+    histograms: Arc<ConcurrentHashMap<String, Histogram>>,
+    labelled_histograms: Arc<ConcurrentHashMap<String, HistogramVec>>,
 }
 
 impl Metrics {
     pub(crate) fn new() -> Metrics {
         Metrics {
             registry: Registry::new(),
-            counters: ConcurrentHashMap::new(),
-            histograms: ConcurrentHashMap::new(),
+            counters: Arc::new(ConcurrentHashMap::new()),
+            labelled_counters: Arc::new(ConcurrentHashMap::new()),
+            histograms: Arc::new(ConcurrentHashMap::new()),
+            labelled_histograms: Arc::new(ConcurrentHashMap::new()),
         }
     }
 
@@ -32,44 +41,57 @@ impl Metrics {
         String::from_utf8(encoded_metrics)
     }
 
-    pub(crate) fn increment(&self, name: &str, increment_by: f64) -> Result<(), ()> {
-        match self.counters.get(name, &self.counters.guard()) {
-            Some(counter) => counter.inc_by(increment_by),
-            None => self.register_counter(name, increment_by),
+    pub(crate) fn increment(
+        &self,
+        name: &'static str,
+        increment_by: f64,
+        labels: &HashMap<&str, &str>,
+    ) {
+        self.ensure_counter_exists(name, labels);
+        self
+            .labelled_counters
+            .get(name, &self.counters.guard())
+            .unwrap()
+            .get_metric_with(labels)
+            .expect("Cannot create labelled metric")
+            .inc_by(increment_by);
+
+    }
+
+    fn ensure_counter_exists(&self, name: &'static str, labels: &HashMap<&str, &str>) {
+        let label_keys: Vec<&str> = labels.keys().map(|k| k.deref()).collect();
+        if !self.labelled_counters.contains_key(name, &self.counters.guard()) {
+            let counter = CounterVec::new(Opts::new(name, name), &label_keys)
+            .expect("Labelled counter cannot be created");
+
+            self.registry.register(Box::new(counter.clone()));
+            self.labelled_counters
+                .insert(String::from(name), counter, &self.labelled_counters.guard());
         }
-        Ok(())
     }
 
-    fn register_counter(&self, name: &str, initial_value: f64) {
-        let counter = CounterVec::new(name, name).expect("Counter to be created sucessfully");
-        counter.inc_by(initial_value);
+    pub(crate) fn record(&self, name: &'static str, value: f64, labels: &HashMap<&str, String>) {
+        self.ensure_histogram_exists(name, labels);
+        let labels_ref: HashMap<&str, &str> = labels.iter().map(|(k,v)| (k.deref(), v.as_str())).collect();
 
-        self.registry
-            .register(Box::new(counter.clone()))
-            .expect(format!("Counter {} to be registered sucessfully", name).as_str());
-
-        self.counters
-            .insert(String::from(name), counter, &self.counters.guard());
+        self
+        .labelled_histograms
+        .get(name, &self.counters.guard())
+        .unwrap()
+        .get_metric_with(&labels_ref)
+        .expect("Cannot create labelled metric")
+        .observe(value);
     }
 
-    pub(crate) fn record(&self, name: &str, value: f64) -> Result<(), ()> {
-        match self.histograms.get(name, &self.histograms.guard()) {
-            Some(histogram) => histogram.observe(value),
-            None => self.register_histogram_and_observe(name, value),
+    fn ensure_histogram_exists(&self, name: &'static str, labels: &HashMap<&str, String>) {
+        let label_keys: Vec<&str> = labels.keys().map(|k| k.deref()).collect();
+        if !self.labelled_histograms.contains_key(name, &self.counters.guard()) {
+            let histogram = HistogramVec::new(HistogramOpts::new(name, name), &label_keys)
+            .expect("Labelled histogram cannot be created");
+
+            self.registry.register(Box::new(histogram.clone()));
+            self.labelled_histograms
+                .insert(String::from(name), histogram, &self.labelled_histograms.guard());
         }
-        Ok(())
-    }
-
-    fn register_histogram_and_observe(&self, name: &str, value: f64) {
-        let histogram = Histogram::with_opts(HistogramOpts::new(name, name))
-            .expect("Histogram to be created sucessfully");
-        histogram.observe(value);
-
-        self.registry
-            .register(Box::new(histogram.clone()))
-            .expect(format!("Histogram {} to be registered sucessfully", name).as_str());
-
-        self.histograms
-            .insert(String::from(name), histogram, &self.histograms.guard());
     }
 }

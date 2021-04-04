@@ -7,15 +7,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8fd72866655d1904d6b0997d0b07ba561047d070fbe29de039031c641b61217"
 
 [[package]]
-name = "assertx"
-version = "1.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2f1c427729e3e9359ee8fc70587ebb0ecdf61cd804aed02383b2c8902357447"
-dependencies = [
- "once_cell",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -108,6 +99,12 @@ checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
 ]
+
+[[package]]
+name = "common_macros"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3f6d59c71e7dc3af60f0af9db32364d96a16e9310f3f5db2b55ed642162dd35"
 
 [[package]]
 name = "const_fn"
@@ -945,8 +942,8 @@ dependencies = [
 name = "rocket-microservice-template"
 version = "0.1.0"
 dependencies = [
- "assertx",
  "async-trait",
+ "common_macros",
  "flurry",
  "prometheus",
  "rocket",
